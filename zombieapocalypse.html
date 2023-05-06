@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Zombie Apocalypse</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+
+    <script>
+        // Game constants
+        const canvas = document.getElementById("game-canvas");
+        const ctx = canvas.getContext("2d");
+        const playerSize = 40;
+        const zombieSize = 30;
+        const bulletSize = 5;
+        const spawnInterval = 3000; // Spawn a zombie every 3 seconds
+        const zombieSpeed = 1;
+        const bulletFireRate = 500; // Fire a bullet every 0.5 seconds
+        const zombieFollowSpeed = 1; // Zombie follow speed
+
+        // Game variables
+        let playerX;
+        let playerY;
+        let zombies = [];
+        let bullets = [];
+        let score = 0;
+        let isGameOver = false;
+        let lastBulletTime = 0;
+
+        // Background image
+        let backgroundImage = new Image();
+        backgroundImage.src = "https://cdn.discordapp.com/attachments/1099335510180245565/1104387838075744306/image.png"; // Replace with your image URL
+
+        // Resize canvas to fill the screen
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            playerX = canvas.width / 2;
+            playerY = canvas.height / 2;
+        }
+
+        // Event listeners
+        window.addEventListener("resize", resizeCanvas);
+        document.addEventListener("keydown", handleKeyDown);
+        canvas.addEventListener("mousemove", handleMouseMove);
+        canvas.addEventListener("click", handleClick);
+
+        // Initialize game
+        resizeCanvas();
+        spawnZombie();
+
+        // Main game loop
+        setInterval(updateGame, 16);
+
+        function handleKeyDown(event) {
+            if (event.code === "KeyW" && playerY > 0) {
+                playerY -= 10;
+            } else if (event.code === "KeyS" && playerY < canvas.height - playerSize) {
+                playerY += 10;
+            } else if (event.code === "KeyA" && playerX > 0) {
+                playerX -= 10;
+            } else if (event.code === "KeyD" && playerX < canvas.width - playerSize) {
+                playerX += 10;
+            }
+        }
+
+        function handleMouseMove(event) {
+            if (!isGameOver) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+
+                const angle = Math.atan2(mouseY - playerY - playerSize / 2, mouseX - playerX - playerSize / 2);
+
+                if (Date.now() - lastBulletTime >= bulletFireRate) {
+                    bullets.push({
+                        x: playerX + playerSize / 2,
+                        y: playerY + playerSize / 2,
+                        dx: Math.cos(angle),
+                        dy: Math.sin(angle),
+                    });
+
+                    lastBulletTime = Date.now();
+                }
+            }
+        }
+
+        function handleClick() {
+            if (isGameOver) {
+                restartGame();
+            }
+        }
+
+        function spawnZombie() {
+            const x = Math.random() * (canvas.width - zombieSize);
+            const y = Math.random() * (canvas.height - zombieSize);
+            zombies.push({ x, y });
+        }
+
+        function updateGame() {
+            if (!isGameOver) {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw background image
+                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+
+                // Draw player
+                ctx.fillStyle = "blue";
+                ctx.fillRect(playerX, playerY, playerSize, playerSize);
+
+                // Draw bullets
+                ctx.fillStyle = "red";
+                for (let i = 0; i < bullets.length; i++) {
+                    ctx.fillRect(bullets[i].x, bullets[i].y, bulletSize, bulletSize);
+                    bullets[i].x += bullets[i].dx * 5;
+                    bullets[i].y += bullets[i].dy * 5;
+
+                    // Check if bullet hit any zombie
+                    for (let j = 0; j < zombies.length; j++) {
+                        if (
+                            bullets[i].x >= zombies[j].x &&
+                            bullets[i].x <= zombies[j].x + zombieSize &&
+                            bullets[i].y >= zombies[j].y &&
+                            bullets[i].y <= zombies[j].y + zombieSize
+                        ) {
+                            // Remove bullet and zombie
+                            bullets.splice(i, 1);
+                            zombies.splice(j, 1);
+                            score++;
+                            break;
+                        }
+                    }
+                }
+
+                // Draw zombies
+                ctx.fillStyle = "green";
+                for (let i = 0; i < zombies.length; i++) {
+                    ctx.fillRect(zombies[i].x, zombies[i].y, zombieSize, zombieSize);
+
+                    // Calculate zombie direction towards the player
+                    const dx = playerX - zombies[i].x;
+                    const dy = playerY - zombies[i].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const directionX = dx / distance;
+                    const directionY = dy / distance;
+
+                    // Move zombies towards the player
+                    zombies[i].x += directionX * zombieSpeed;
+                    zombies[i].y += directionY * zombieSpeed;
+
+                    // Check if any zombie touches the player
+                    if (
+                        zombies[i].x + zombieSize >= playerX &&
+                        zombies[i].x <= playerX + playerSize &&
+                        zombies[i].y + zombieSize >= playerY &&
+                        zombies[i].y <= playerY + playerSize
+                    ) {
+                        gameOver();
+                        break;
+                    }
+                }
+
+                // Spawn zombies at regular intervals
+                if (Math.random() < 0.01 && zombies.length < 5) {
+                    spawnZombie();
+                }
+
+                // Update score
+                document.getElementById("score").textContent = "Score: " + score;
+            }
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            ctx.font = "30px Arial";
+            ctx.fillStyle = "red";
+            ctx.fillText("Game Over", canvas.width / 2 - 80, canvas.height / 2);
+            ctx.fillText("Click to restart", canvas.width / 2 - 100, canvas.height / 2 + 40);
+        }
+
+        function restartGame() {
+            isGameOver = false;
+            playerX = canvas.width / 2;
+            playerY = canvas.height / 2;
+            zombies = [];
+            bullets = [];
+            score = 0;
+            lastBulletTime = 0;
+        }
+    </script>
+</body>
+</html>
